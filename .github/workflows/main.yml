@@ -65,13 +65,33 @@ jobs:
             "dist/" || echo "DMG creation skipped"
         fi
     
+    - name: Rename files to English names
+      run: |
+        # 创建发布目录
+        mkdir -p release
+        
+        # 重命名 .app 文件（目录）
+        if [ -d "dist/PDF处理器.app" ]; then
+          cp -R "dist/PDF处理器.app" "release/PDFProcessor.app"
+        fi
+        
+        # 重命名 .dmg 文件
+        if [ -f "dist/PDF处理器.dmg" ]; then
+          cp "dist/PDF处理器.dmg" "release/PDFProcessor.dmg"
+        fi
+        
+        # 列出发布目录内容（用于调试）
+        echo "=== Release directory contents ==="
+        ls -la release/
+    
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: PDF处理器-Mac
+        name: PDFProcessor-Mac
         path: |
-          dist/PDF处理器.app
-          dist/*.dmg
+          release/PDFProcessor.app
+          release/PDFProcessor.dmg
+        if-no-files-found: warn
         retention-days: 30
     
     - name: Create Release (if tag)
@@ -79,8 +99,8 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          dist/PDF处理器.app
-          dist/*.dmg
+          release/PDFProcessor.app
+          release/PDFProcessor.dmg
         draft: false
         prerelease: false
       env:
