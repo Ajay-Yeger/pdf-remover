@@ -286,7 +286,7 @@ class PDFProcessorThread(QThread):
                         self.status.emit("  - 正在调用华为云OCR API识别图片文字...")
                         config = load_config()
                         project_id = config.get("huawei_project_id", "")
-                        region = config.get("huawei_project", "cn-north-4")
+                        region = config.get("huawei_project", "cn-east-3")
                         
                         if project_id:
                             ocr_result = call_huawei_ocr_api(
@@ -1056,7 +1056,7 @@ def load_config():
         "huawei_username": "tckeke123cck",
         "huawei_domain": "hid_46npa4c6rmavfjz",
         "huawei_password": "cc961121",
-        "huawei_project": "cn-southwest-2",
+        "huawei_project": "cn-east-3",
         "huawei_project_id":"17bd5a8f587e44718ce0a9981d1893ff",
         "employee_id": "",
         "employee_name": "",
@@ -1100,7 +1100,7 @@ def save_config(output_dir="", image_output_dir="", huawei_username="", huawei_d
         huawei_username = existing_config.get("huawei_username", "")
         huawei_domain = existing_config.get("huawei_domain", "")
         huawei_password = existing_config.get("huawei_password", "")
-        huawei_project = existing_config.get("huawei_project", "cn-north-4")
+        huawei_project = existing_config.get("huawei_project", "cn-east-3")
     
     config = {
         "output_dir": output_dir,
