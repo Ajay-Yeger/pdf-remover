@@ -100,8 +100,9 @@ a = Analysis(
         'wx', 'wxpython',
 
         # ========== 测试框架 ==========
-        'unittest', 'pytest', 'nose',
+        'pytest', 'nose',
         'doctest',
+        # 注意：不移除 'unittest'，因为某些依赖（如 PyQt5）可能在运行时需要它
 
         # ========== 标准库 / 工具中运行时不需要的部分 ==========
         'xmlrpc', 'xmlrpc.client', 'xmlrpc.server',
@@ -144,7 +145,7 @@ exe = EXE(
     console=False,  # Mac GUI应用不显示控制台
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch=None,
+    target_arch=None,  # 使用运行环境的默认架构
     codesign_identity=None,  # 如果需要代码签名，填写开发者ID，例如: 'Developer ID Application: Your Name'
     entitlements_file=None,  # 如果需要特殊权限，指定entitlements文件路径
     icon=None,  # Mac图标文件路径，格式为 .icns，例如: 'icon.icns'
@@ -160,5 +161,6 @@ app = BUNDLE(
     info_plist={
         'NSHighResolutionCapable': 'True',  # 支持高分辨率显示
         'NSRequiresAquaSystemAppearance': 'False',  # 支持深色模式
+        'LSMinimumSystemVersion': '10.15',  # 最低支持的 macOS 版本 (Catalina)
     },
 )
