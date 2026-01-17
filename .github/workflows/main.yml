@@ -54,7 +54,56 @@ jobs:
     - name: Build Mac application
       run: |
         source venv/bin/activate
+        # 设置最低 macOS 版本为 10.15 (Catalina)，以支持较老的系统
+        export MACOSX_DEPLOYMENT_TARGET=10.15
         pyinstaller build_exe_mac.spec
+    
+    - name: Verify application structure
+      run: |
+        echo "=== Verifying .app structure (onedir mode) ==="
+        
+        # 检查 .app 目录是否存在
+        if [ ! -d "dist/PDF处理器.app" ]; then
+          echo "❌ Error: PDF处理器.app not found!"
+          exit 1
+        fi
+        
+        # 检查 Contents 目录
+        if [ ! -d "dist/PDF处理器.app/Contents" ]; then
+          echo "❌ Error: Contents directory not found!"
+          exit 1
+        fi
+        
+        # 检查 MacOS 目录和可执行文件
+        if [ ! -d "dist/PDF处理器.app/Contents/MacOS" ]; then
+          echo "❌ Error: MacOS directory not found!"
+          exit 1
+        fi
+        
+        APP_EXEC="dist/PDF处理器.app/Contents/MacOS/PDF处理器"
+        if [ ! -f "$APP_EXEC" ]; then
+          echo "❌ Error: Executable file not found!"
+          exit 1
+        fi
+        
+        # 检查 onedir 模式的文件结构（应该有 _internal 或 PDF处理器 目录）
+        MACOS_DIR="dist/PDF处理器.app/Contents/MacOS"
+        if [ -d "$MACOS_DIR/_internal" ] || [ -d "$MACOS_DIR/PDF处理器" ]; then
+          echo "✓ onedir structure detected"
+          echo "=== Directory structure ==="
+          ls -la "$MACOS_DIR" | head -20
+        else
+          echo "⚠ Warning: onedir structure not found, checking for onefile mode"
+          ls -la "$MACOS_DIR"
+        fi
+        
+        # 检查资源文件
+        if [ -d "dist/PDF处理器.app/Contents/Resources" ]; then
+          echo "=== Resources directory ==="
+          ls -la "dist/PDF处理器.app/Contents/Resources/" || echo "Resources directory is empty"
+        fi
+        
+        echo "✓ Application structure is valid"
     
     - name: Test application launch
       run: |
