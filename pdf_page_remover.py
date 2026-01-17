@@ -3,6 +3,75 @@ import os
 import json
 import requests
 import base64
+
+# 在导入 matplotlib 相关模块之前，设置 matplotlib 缓存目录
+# 这样可以避免每次启动时都重新构建字体缓存
+def _setup_matplotlib_cache():
+    """设置 matplotlib 缓存目录到应用目录"""
+    try:
+        # 获取应用基础目录
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # 设置 matplotlib 缓存目录
+        cache_dir = os.path.join(base_dir, '.matplotlib')
+        os.makedirs(cache_dir, exist_ok=True)
+        os.environ['MPLCONFIGDIR'] = cache_dir
+    except Exception:
+        pass
+
+# 立即设置缓存目录（在导入任何 matplotlib 相关模块之前）
+_setup_matplotlib_cache()
+
+# 在导入 credit_score_visualizer（会导入 matplotlib）之前，预构建字体缓存
+def _prebuild_matplotlib_font_cache_early():
+    """
+    在导入 matplotlib 相关模块之前预构建字体缓存
+    这样可以避免在导入时触发缓存构建，从而加速启动
+    """
+    try:
+        import matplotlib
+        import matplotlib.font_manager
+        import warnings
+        
+        # 获取缓存目录
+        cache_dir = os.environ.get('MPLCONFIGDIR')
+        if not cache_dir:
+            if getattr(sys, 'frozen', False):
+                cache_dir = os.path.join(os.path.dirname(sys.executable), '.matplotlib')
+            else:
+                cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.matplotlib')
+        
+        # 检查缓存文件是否存在
+        cache_files = [
+            os.path.join(cache_dir, 'fontlist-v330.json'),
+            os.path.join(cache_dir, 'fontlist-v320.json'),
+            os.path.join(cache_dir, 'fontlist.json'),
+        ]
+        
+        cache_exists = any(os.path.exists(f) for f in cache_files)
+        
+        if not cache_exists:
+            # 缓存不存在，需要构建（静默模式）
+            matplotlib.use('Agg')  # 使用非 GUI 后端
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                import io
+                import contextlib
+                
+                with contextlib.redirect_stdout(io.StringIO()):
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        # 触发字体管理器初始化，这会构建缓存
+                        _ = matplotlib.font_manager.fontManager
+    except Exception:
+        # 如果预构建失败，不影响应用启动
+        pass
+
+# 在导入 credit_score_visualizer 之前预构建缓存
+_prebuild_matplotlib_font_cache_early()
+
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -286,7 +355,7 @@ class PDFProcessorThread(QThread):
                         self.status.emit("  - 正在调用华为云OCR API识别图片文字...")
                         config = load_config()
                         project_id = config.get("huawei_project_id", "")
-                        region = config.get("huawei_project", "cn-east-3")
+                        region = config.get("huawei_project", "cn-north-4")
                         
                         if project_id:
                             ocr_result = call_huawei_ocr_api(
@@ -1100,7 +1169,7 @@ def save_config(output_dir="", image_output_dir="", huawei_username="", huawei_d
         huawei_username = existing_config.get("huawei_username", "")
         huawei_domain = existing_config.get("huawei_domain", "")
         huawei_password = existing_config.get("huawei_password", "")
-        huawei_project = existing_config.get("huawei_project", "cn-east-3")
+        huawei_project = existing_config.get("huawei_project", "cn-north-4")
     
     config = {
         "output_dir": output_dir,
@@ -1885,7 +1954,50 @@ class PDFPageRemoverGUI(QMainWindow):
             self.status_text.append("如需使用OCR功能，请在配置文件中添加华为云账号信息")
 
 
+def _prebuild_matplotlib_font_cache():
+    """
+    预构建 matplotlib 字体缓存，避免每次启动时都重新构建
+    只在缓存不存在时构建一次
+    """
+    try:
+        import matplotlib
+        import matplotlib.font_manager
+        import warnings
+        
+        # 获取缓存目录（已经在 _setup_matplotlib_cache 中设置）
+        cache_dir = os.environ.get('MPLCONFIGDIR', os.path.join(get_base_dir(), '.matplotlib'))
+        
+        # 检查缓存文件是否存在（不同版本的 matplotlib 缓存文件名可能不同）
+        cache_files = [
+            os.path.join(cache_dir, 'fontlist-v330.json'),
+            os.path.join(cache_dir, 'fontlist-v320.json'),
+            os.path.join(cache_dir, 'fontlist.json'),
+        ]
+        
+        cache_exists = any(os.path.exists(f) for f in cache_files)
+        
+        if not cache_exists:
+            # 缓存不存在，需要构建（静默模式）
+            # 抑制所有警告和输出
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                # 重定向 stdout 来抑制 "building font cache" 消息
+                import io
+                import contextlib
+                
+                with contextlib.redirect_stdout(io.StringIO()):
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        # 触发字体管理器初始化，这会构建缓存
+                        # 通过访问 fontManager 来触发缓存构建
+                        _ = matplotlib.font_manager.fontManager
+    except Exception:
+        # 如果预构建失败，不影响应用启动
+        pass
+
+
 def main():
+    # 字体缓存已经在导入 credit_score_visualizer 之前预构建了
+    # 这里不需要再次构建
     app = QApplication(sys.argv)
     window = PDFPageRemoverGUI()
     window.show()
