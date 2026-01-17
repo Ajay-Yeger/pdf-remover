@@ -18,10 +18,10 @@ jobs:
         arch: [intel, apple-silicon]
         include:
           - arch: intel
-            runner: macos-13  # Intel 架构
+            runner: macos-15-intel  # Intel 架构 (x86_64)
             suffix: -Intel
           - arch: apple-silicon
-            runner: macos-latest  # Apple Silicon 架构
+            runner: macos-latest  # Apple Silicon 架构 (arm64)
             suffix: -AppleSilicon
     runs-on: ${{ matrix.runner }}
     
