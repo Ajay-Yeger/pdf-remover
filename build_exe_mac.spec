@@ -123,25 +123,23 @@ a = Analysis(
         'PyQt5.tests',
     ],
     cipher=block_cipher,
-    noarchive=False,
+    noarchive=True,  # 设置为 True，不将所有文件打包到 zip，直接作为文件存储，加快启动速度
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# 使用 onedir 模式（COLLECT），而不是 onefile 模式
+# onedir 模式将所有文件放在目录中，启动时无需解压，速度更快
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
+    [],  # 不将二进制文件打包到 exe 中
+    exclude_binaries=True,  # 排除二进制文件，使用目录模式
     name='PDF处理器',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
+    upx=False,  # 禁用 UPX 压缩，减少启动时的解压缩时间
     console=False,  # Mac GUI应用不显示控制台
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -151,9 +149,23 @@ exe = EXE(
     icon=None,  # Mac图标文件路径，格式为 .icns，例如: 'icon.icns'
 )
 
-# Mac 应用需要 COLLECT 来创建 .app 目录结构
-app = BUNDLE(
+# COLLECT 模式（onedir）：将所有文件放在一个目录中
+# 这样可以避免启动时的解压过程，大幅提升启动速度
+# 文件结构：PDF处理器.app/Contents/MacOS/PDF处理器（可执行文件）+ 所有依赖文件
+coll = COLLECT(
     exe,
+    a.binaries,  # 二进制文件放在目录中，而不是打包到 exe
+    a.zipfiles,  # zip 文件放在目录中
+    a.datas,     # 数据文件放在目录中
+    strip=False,
+    upx=False,   # 禁用 UPX 压缩
+    upx_exclude=[],
+    name='PDF处理器',
+)
+
+# Mac 应用需要 BUNDLE 来创建 .app 目录结构
+app = BUNDLE(
+    coll,
     name='PDF处理器.app',
     icon=None,  # Mac图标文件路径，格式为 .icns
     bundle_identifier='com.yourcompany.pdfprocessor',  # 应用标识符，建议修改为你的唯一标识
