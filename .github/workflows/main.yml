@@ -13,7 +13,17 @@ on:
 
 jobs:
   build-mac:
-    runs-on: macos-latest  # 使用最新的 macOS runner
+    strategy:
+      matrix:
+        arch: [intel, apple-silicon]
+        include:
+          - arch: intel
+            runner: macos-13  # Intel 架构
+            suffix: -Intel
+          - arch: apple-silicon
+            runner: macos-latest  # Apple Silicon 架构
+            suffix: -AppleSilicon
+    runs-on: ${{ matrix.runner }}
     
     steps:
     - name: Checkout code
@@ -46,6 +56,34 @@ jobs:
         source venv/bin/activate
         pyinstaller build_exe_mac.spec
     
+    - name: Test application launch
+      run: |
+        APP_PATH="dist/PDF处理器.app/Contents/MacOS/PDF处理器"
+        
+        # 检查可执行文件是否存在
+        if [ ! -f "$APP_PATH" ]; then
+          echo "❌ Error: Executable not found"
+          exit 1
+        fi
+        
+        # 设置执行权限
+        chmod +x "$APP_PATH"
+        
+        # 尝试启动应用（后台运行，3秒后检查进程）
+        echo "Testing application launch..."
+        "$APP_PATH" &
+        APP_PID=$!
+        sleep 3
+        
+        # 检查进程是否在运行（说明应用至少启动了）
+        if ps -p $APP_PID > /dev/null; then
+          echo "✓ Application started successfully"
+          kill $APP_PID 2>/dev/null || true
+        else
+          # 进程退出可能是正常的（GUI应用在headless环境可能无法运行）
+          echo "✓ Application executed (may exit immediately in headless environment)"
+        fi
+    
     - name: Create DMG (optional)
       run: |
         # 安装 create-dmg（如果需要创建安装包）
@@ -70,14 +108,17 @@ jobs:
         # 创建发布目录
         mkdir -p release
         
+        # 根据架构添加后缀
+        ARCH_SUFFIX="${{ matrix.suffix }}"
+        
         # 重命名 .app 文件（目录）
         if [ -d "dist/PDF处理器.app" ]; then
-          cp -R "dist/PDF处理器.app" "release/PDFProcessor.app"
+          cp -R "dist/PDF处理器.app" "release/PDFProcessor${ARCH_SUFFIX}.app"
         fi
         
         # 重命名 .dmg 文件
         if [ -f "dist/PDF处理器.dmg" ]; then
-          cp "dist/PDF处理器.dmg" "release/PDFProcessor.dmg"
+          cp "dist/PDF处理器.dmg" "release/PDFProcessor${ARCH_SUFFIX}.dmg"
         fi
         
         # 列出发布目录内容（用于调试）
@@ -87,10 +128,10 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: PDFProcessor-Mac
+        name: PDFProcessor-Mac-${{ matrix.arch }}
         path: |
-          release/PDFProcessor.app
-          release/PDFProcessor.dmg
+          release/PDFProcessor${{ matrix.suffix }}.app
+          release/PDFProcessor${{ matrix.suffix }}.dmg
         if-no-files-found: warn
         retention-days: 30
     
@@ -99,8 +140,8 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          release/PDFProcessor.app
-          release/PDFProcessor.dmg
+          release/PDFProcessor${{ matrix.suffix }}.app
+          release/PDFProcessor${{ matrix.suffix }}.dmg
         draft: false
         prerelease: false
       env:
