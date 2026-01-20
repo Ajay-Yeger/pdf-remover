@@ -5,11 +5,6 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: '版本号'
-        required: false
-        default: '1.0.0'
 
 jobs:
   build-mac-intel:
@@ -19,26 +14,31 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Install Miniconda
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniconda-version: "latest"
+        auto-update-conda: true
+        python-version: 3.9
+        architecture: x86_64
+        activate-environment: build_env
+        environment-file: environment.yml  # 可选，如果你有 conda dependencies
+
     - name: Install system dependencies
       run: |
-        # 安装 gettext 解决 Python 3.9 Intel 依赖问题
-        brew install gettext
+        brew install gettext pyqt@5
         brew link --force gettext
-
-    - name: Setup Python 3.9 Intel
-      uses: actions/setup-python@v5
-      with:
-        python-version: 3.9.16
-        architecture: x64
 
     - name: Install Python dependencies
       run: |
-        python -m pip install --upgrade pip
+        conda activate build_env
+        pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
 
     - name: Build Mac application
       run: |
+        conda activate build_env
         export MACOSX_DEPLOYMENT_TARGET=12.0
         export CFLAGS="-mmacosx-version-min=12.0"
         export CXXFLAGS="-mmacosx-version-min=12.0"
@@ -46,7 +46,7 @@ jobs:
 
         pyinstaller build_exe_mac.spec
 
-    - name: Fix application permissions and structure
+    - name: Fix permissions and code sign
       run: |
         APP_EXEC="dist/PDF处理器.app/Contents/MacOS/PDF处理器"
         chmod +x "$APP_EXEC"
@@ -68,32 +68,12 @@ jobs:
             "dist/" || echo "DMG creation skipped"
         fi
 
-    - name: Rename files to English names
-      run: |
-        mkdir -p release
-        cp -R "dist/PDF处理器.app" "release/PDFProcessor.app"
-        chmod +x "release/PDFProcessor.app/Contents/MacOS/PDF处理器"
-        codesign --force --deep --sign - "release/PDFProcessor.app" || true
-        [ -f "dist/PDF处理器.dmg" ] && cp "dist/PDF处理器.dmg" "release/PDFProcessor.dmg"
-
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: PDFProcessor-Mac-Intel
         path: |
-          release/PDFProcessor.app
-          release/PDFProcessor.dmg
+          dist/PDF处理器.app
+          dist/PDF处理器.dmg
         if-no-files-found: warn
         retention-days: 30
-
-    - name: Create Release (if tag)
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          release/PDFProcessor.app
-          release/PDFProcessor.dmg
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
