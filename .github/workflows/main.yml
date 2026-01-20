@@ -73,9 +73,9 @@ jobs:
         echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
         pyinstaller build_exe_mac.spec
     
-    - name: Verify application structure
+    - name: Fix application permissions and structure
       run: |
-        echo "=== Verifying .app structure (onedir mode) ==="
+        echo "=== Fixing application permissions ==="
         
         # 检查 .app 目录是否存在
         if [ ! -d "dist/PDF处理器.app" ]; then
@@ -100,6 +100,31 @@ jobs:
           echo "❌ Error: Executable file not found!"
           exit 1
         fi
+        
+        # 设置可执行文件权限（非常重要！）
+        chmod +x "$APP_EXEC"
+        echo "✓ Set executable permission on $APP_EXEC"
+        
+        # 检查架构
+        if command -v file >/dev/null 2>&1; then
+          echo "=== Checking executable architecture ==="
+          file "$APP_EXEC"
+        fi
+        
+        # 使用 ad-hoc 代码签名（即使没有开发者证书，也可以让应用在本地运行）
+        # 这对于未签名的应用是必需的，否则 macOS Gatekeeper 会阻止运行
+        echo "=== Applying ad-hoc code signature ==="
+        codesign --force --deep --sign - "dist/PDF处理器.app" || echo "⚠ Code signing failed (may need developer certificate)"
+        
+        # 验证签名
+        codesign --verify --verbose "dist/PDF处理器.app" || echo "⚠ Code signature verification failed"
+        
+        # 检查 Gatekeeper 状态
+        spctl --assess --verbose "dist/PDF处理器.app" || echo "⚠ Gatekeeper assessment failed (expected for unsigned apps)"
+    
+    - name: Verify application structure
+      run: |
+        echo "=== Verifying .app structure (onedir mode) ==="
         
         # 检查 onedir 模式的文件结构（应该有 _internal 或 PDF处理器 目录）
         MACOS_DIR="dist/PDF处理器.app/Contents/MacOS"
@@ -190,6 +215,10 @@ jobs:
         # 重命名 .app 文件（目录）
         if [ -d "dist/PDF处理器.app" ]; then
           cp -R "dist/PDF处理器.app" "release/PDFProcessor${ARCH_SUFFIX}.app"
+          # 确保复制的文件也有执行权限
+          chmod +x "release/PDFProcessor${ARCH_SUFFIX}.app/Contents/MacOS/PDF处理器"
+          # 重新签名复制的应用
+          codesign --force --deep --sign - "release/PDFProcessor${ARCH_SUFFIX}.app" || echo "⚠ Code signing failed"
         fi
         
         # 重命名 .dmg 文件
