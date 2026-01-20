@@ -13,17 +13,7 @@ on:
 
 jobs:
   build-mac:
-    strategy:
-      matrix:
-        arch: [intel, apple-silicon]
-        include:
-          - arch: intel
-            runner: macos-14  # Intel 架构 (x86_64)，使用 macOS 14 以更好兼容 macOS 12.7
-            suffix: -Intel
-          - arch: apple-silicon
-            runner: macos-14  # Apple Silicon 架构 (arm64)，使用 macOS 14 以更好兼容 macOS 12.7
-            suffix: -AppleSilicon
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-14  # 使用 macOS 14 runner（支持 Universal2 构建）
     
     steps:
     - name: Checkout code
@@ -42,12 +32,57 @@ jobs:
         # 安装 PyQt5 可能需要的系统库
         brew install python-tk@3.11 || true
     
-    - name: Create conda environment
+    - name: Create conda environment with Universal2 Python
       shell: bash -l {0}
       run: |
-        conda create -n build_env python=3.9 -y
+        # 创建独立的 conda 环境，使用 Python 3.9
+        # conda-forge 的 Python 3.9 在某些情况下可能是 universal2
+        conda create -n build_env python=3.9 -y -c conda-forge
         conda activate build_env
-        python --version
+        
+        # 验证 Python 版本
+        PYTHON_VERSION=$(python --version 2>&1 | awk '{print $2}')
+        PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
+        PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+        if [ "$PYTHON_MAJOR" != "3" ] || [ "$PYTHON_MINOR" != "9" ]; then
+          echo "❌ Error: Python version must be 3.9.x, but got $PYTHON_VERSION"
+          exit 1
+        fi
+        echo "✓ Python version: $PYTHON_VERSION"
+        
+        # 检查 Python 架构（检查是否是 universal2）
+        PYTHON_EXEC=$(which python)
+        echo "Python executable: $PYTHON_EXEC"
+        
+        if command -v lipo >/dev/null 2>&1; then
+          ARCH_INFO=$(lipo -info "$PYTHON_EXEC" 2>&1 || echo "Not a fat binary")
+          echo "Python architecture info: $ARCH_INFO"
+          if echo "$ARCH_INFO" | grep -q "x86_64\|arm64"; then
+            if echo "$ARCH_INFO" | grep -q "x86_64" && echo "$ARCH_INFO" | grep -q "arm64"; then
+              echo "✓ Python is Universal2 (supports both x86_64 and arm64)"
+            else
+              echo "⚠ Warning: Python is not Universal2, only supports single architecture"
+            fi
+          fi
+        fi
+        
+        # 检查 Python 库路径
+        PYTHON_LIB_PATH=$(python -c "import sys; print(sys.executable)" | xargs dirname)
+        echo "Python library path: $PYTHON_LIB_PATH"
+        
+        # 检查是否存在 libpython3.9（应该存在）
+        CONDA_PREFIX=$(conda info --base)/envs/build_env
+        if [ -f "$CONDA_PREFIX/lib/libpython3.9.dylib" ]; then
+          echo "✓ Found libpython3.9.dylib in conda environment"
+          # 检查库的架构
+          if command -v lipo >/dev/null 2>&1; then
+            LIB_ARCH=$(lipo -info "$CONDA_PREFIX/lib/libpython3.9.dylib" 2>&1 || echo "Not a fat binary")
+            echo "Python library architecture: $LIB_ARCH"
+          fi
+        else
+          echo "⚠ Warning: libpython3.9.dylib not found in conda environment"
+        fi
+        
         # 检查 Python 的 deployment target（conda 的 Python 通常兼容性更好）
         python -c "import sysconfig; dt = sysconfig.get_config_var('MACOSX_DEPLOYMENT_TARGET'); print(f'Python deployment target: {dt}')" || echo "Deployment target check skipped"
     
@@ -59,6 +94,19 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
     
+    - name: Set Universal2 architecture
+      id: set_arch
+      run: |
+        # 设置目标架构为 Universal2（支持 Intel 和 Apple Silicon）
+        TARGET_ARCH="universal2"
+        echo "target_arch=$TARGET_ARCH" >> $GITHUB_OUTPUT
+        echo "✓ Building Universal2 binary (supports both Intel x86_64 and Apple Silicon arm64)"
+        
+        # 检测当前 runner 的架构（用于信息显示）
+        ARCH=$(uname -m)
+        echo "Runner architecture: $ARCH"
+        echo "Target architecture: $TARGET_ARCH"
+    
     - name: Build Mac application
       shell: bash -l {0}
       run: |
@@ -69,9 +117,51 @@ jobs:
         export CFLAGS="-mmacosx-version-min=12.0"
         export CXXFLAGS="-mmacosx-version-min=12.0"
         export LDFLAGS="-mmacosx-version-min=12.0"
+        
+        # 获取目标架构（Universal2）
+        TARGET_ARCH="${{ steps.set_arch.outputs.target_arch }}"
+        echo "Building for architecture: $TARGET_ARCH (Universal2)"
+        
+        # 修改 spec 文件以设置正确的架构为 Universal2
+        sed -i.bak "s/target_arch=None,  # 使用运行环境的默认架构/target_arch='universal2',  # Universal2: 支持 Intel (x86_64) 和 Apple Silicon (arm64)/" build_exe_mac.spec
+        
         # 验证环境变量
         echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
+        echo "TARGET_ARCH=$TARGET_ARCH"
+        
+        # 验证 Python 版本（必须是 3.9）
+        PYTHON_VERSION=$(python --version 2>&1 | awk '{print $2}')
+        PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
+        PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+        echo "Python version: $PYTHON_VERSION"
+        if [ "$PYTHON_MAJOR" != "3" ] || [ "$PYTHON_MINOR" != "9" ]; then
+          echo "❌ Error: Python version must be 3.9.x, but got $PYTHON_VERSION"
+          exit 1
+        fi
+        echo "✓ Python version verified: $PYTHON_VERSION"
+        
+        # 检查 Python 库路径，确保使用的是 conda 的 Python 3.9
+        PYTHON_LIB=$(python -c "import sys; print(sys.executable)" | xargs dirname)
+        echo "Python executable directory: $PYTHON_LIB"
+        
+        # 检查是否存在 libpython3.9（应该存在）
+        if [ -f "$PYTHON_LIB/../lib/libpython3.9.dylib" ] || [ -f "$CONDA_PREFIX/lib/libpython3.9.dylib" ]; then
+          echo "✓ Found libpython3.9.dylib"
+        else
+          echo "⚠ Warning: libpython3.9.dylib not found in expected location"
+        fi
+        
+        # 检查是否错误地包含了 libpython3.10
+        if [ -f "$PYTHON_LIB/../lib/libpython3.10.dylib" ] || [ -f "$CONDA_PREFIX/lib/libpython3.10.dylib" ]; then
+          echo "❌ Error: Found libpython3.10.dylib - this should not exist!"
+          echo "This will cause compatibility issues on macOS 12.7"
+          exit 1
+        fi
+        
         pyinstaller build_exe_mac.spec
+        
+        # 恢复原始 spec 文件
+        mv build_exe_mac.spec.bak build_exe_mac.spec || true
     
     - name: Fix application permissions and structure
       run: |
@@ -106,9 +196,24 @@ jobs:
         echo "✓ Set executable permission on $APP_EXEC"
         
         # 检查架构
+        echo "=== Checking executable architecture ==="
         if command -v file >/dev/null 2>&1; then
-          echo "=== Checking executable architecture ==="
-          file "$APP_EXEC"
+          ARCH_INFO=$(file "$APP_EXEC")
+          echo "$ARCH_INFO"
+          # 验证架构（应该是 Universal2，包含 x86_64 和 arm64）
+          if echo "$ARCH_INFO" | grep -q "x86_64" && echo "$ARCH_INFO" | grep -q "arm64"; then
+            echo "✓ Executable is Universal2 (supports both x86_64 and arm64)"
+          elif echo "$ARCH_INFO" | grep -q "x86_64\|arm64"; then
+            echo "⚠ Warning: Executable is single-architecture, not Universal2"
+          else
+            echo "⚠ Warning: Could not determine architecture"
+          fi
+        fi
+        
+        # 使用 otool 检查架构（更详细）
+        if command -v otool >/dev/null 2>&1; then
+          echo "=== Detailed architecture info ==="
+          otool -hv "$APP_EXEC" | head -5 || echo "otool check skipped"
         fi
         
         # 使用 ad-hoc 代码签名（即使没有开发者证书，也可以让应用在本地运行）
@@ -145,15 +250,38 @@ jobs:
         
         # 检查 Python 库的兼容性（查找 libpython）
         echo "=== Checking Python library compatibility ==="
-        find "dist/PDF处理器.app" -name "libpython*.dylib" -exec sh -c '
-          echo "Found: $1"
-          if command -v otool >/dev/null 2>&1; then
-            echo "Checking deployment target:"
-            otool -l "$1" | grep -A 3 "LC_VERSION_MIN_MACOSX" || echo "  No deployment target info found"
-            echo "Checking linked libraries:"
-            otool -L "$1" | head -5
-          fi
-        ' _ {} \;
+        PYTHON_LIBS=$(find "dist/PDF处理器.app" -name "libpython*.dylib")
+        if [ -z "$PYTHON_LIBS" ]; then
+          echo "⚠ Warning: No libpython*.dylib found in app bundle"
+        else
+          echo "$PYTHON_LIBS" | while read lib; do
+            echo "Found: $lib"
+            # 检查是否是 libpython3.10（不应该存在）
+            if echo "$lib" | grep -q "libpython3.10"; then
+              echo "❌ ERROR: Found libpython3.10.dylib - this will cause _mkfifoat error on macOS 12.7!"
+              echo "The app should use libpython3.9.dylib instead"
+              exit 1
+            fi
+            # 检查是否是 libpython3.9（应该存在）
+            if echo "$lib" | grep -q "libpython3.9"; then
+              echo "✓ Correct Python library: libpython3.9.dylib"
+            fi
+            if command -v otool >/dev/null 2>&1; then
+              echo "Checking deployment target:"
+              otool -l "$lib" | grep -A 3 "LC_VERSION_MIN_MACOSX" || echo "  No deployment target info found"
+              echo "Checking linked libraries:"
+              otool -L "$lib" | head -5
+              # 检查是否包含 _mkfifoat 符号（不应该有）
+              if nm "$lib" 2>/dev/null | grep -q "_mkfifoat"; then
+                echo "❌ ERROR: Library contains _mkfifoat symbol (macOS 13+ only)!"
+                echo "This will fail on macOS 12.7"
+                exit 1
+              else
+                echo "✓ No _mkfifoat symbol found (compatible with macOS 12.7)"
+              fi
+            fi
+          done
+        fi
         
         echo "✓ Application structure is valid"
     
@@ -209,16 +337,16 @@ jobs:
         # 创建发布目录
         mkdir -p release
         
-        # 根据架构添加后缀
-        ARCH_SUFFIX="${{ matrix.suffix }}"
+        # Universal2 版本不需要架构后缀
+        APP_NAME="PDFProcessor"
         
         # 重命名 .app 文件（目录）
         if [ -d "dist/PDF处理器.app" ]; then
-          cp -R "dist/PDF处理器.app" "release/PDFProcessor${ARCH_SUFFIX}.app"
+          cp -R "dist/PDF处理器.app" "release/${APP_NAME}.app"
           # 确保复制的文件也有执行权限
-          chmod +x "release/PDFProcessor${ARCH_SUFFIX}.app/Contents/MacOS/PDF处理器"
+          chmod +x "release/${APP_NAME}.app/Contents/MacOS/PDF处理器"
           # 重新签名复制的应用
-          codesign --force --deep --sign - "release/PDFProcessor${ARCH_SUFFIX}.app" || echo "⚠ Code signing failed"
+          codesign --force --deep --sign - "release/${APP_NAME}.app" || echo "⚠ Code signing failed"
         fi
         
         # 重命名 .dmg 文件
@@ -233,10 +361,10 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: PDFProcessor-Mac-${{ matrix.arch }}
+        name: PDFProcessor-Mac-Universal2
         path: |
-          release/PDFProcessor${{ matrix.suffix }}.app
-          release/PDFProcessor${{ matrix.suffix }}.dmg
+          release/PDFProcessor.app
+          release/PDFProcessor.dmg
         if-no-files-found: warn
         retention-days: 30
     
@@ -245,8 +373,8 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          release/PDFProcessor${{ matrix.suffix }}.app
-          release/PDFProcessor${{ matrix.suffix }}.dmg
+          release/PDFProcessor.app
+          release/PDFProcessor.dmg
         draft: false
         prerelease: false
       env:
