@@ -13,17 +13,23 @@ on:
 
 jobs:
   build-mac-intel:
-    runs-on: macos-14  # 最新 macOS runner，兼容 Intel
+    runs-on: macos-14
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Install system dependencies
+      run: |
+        # 安装 gettext 解决 Python 3.9 Intel 依赖问题
+        brew install gettext
+        brew link --force gettext
+
     - name: Setup Python 3.9 Intel
       uses: actions/setup-python@v5
       with:
-        python-version: 3.9.16  # 官方缓存里 Intel 3.9 有效版本
-        architecture: x64       # Intel 架构
+        python-version: 3.9.16
+        architecture: x64
 
     - name: Install Python dependencies
       run: |
@@ -40,7 +46,7 @@ jobs:
 
         pyinstaller build_exe_mac.spec
 
-    - name: Fix application permissions
+    - name: Fix application permissions and structure
       run: |
         APP_EXEC="dist/PDF处理器.app/Contents/MacOS/PDF处理器"
         chmod +x "$APP_EXEC"
@@ -62,7 +68,7 @@ jobs:
             "dist/" || echo "DMG creation skipped"
         fi
 
-    - name: Rename files to English
+    - name: Rename files to English names
       run: |
         mkdir -p release
         cp -R "dist/PDF处理器.app" "release/PDFProcessor.app"
@@ -80,7 +86,7 @@ jobs:
         if-no-files-found: warn
         retention-days: 30
 
-    - name: Create GitHub Release (if tag)
+    - name: Create Release (if tag)
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
