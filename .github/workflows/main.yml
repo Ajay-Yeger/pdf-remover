@@ -122,8 +122,33 @@ jobs:
         TARGET_ARCH="${{ steps.set_arch.outputs.target_arch }}"
         echo "Building for architecture: $TARGET_ARCH (Universal2)"
         
-        # 修改 spec 文件以设置正确的架构为 Universal2
-        sed -i.bak "s/target_arch=None,  # 使用运行环境的默认架构/target_arch='universal2',  # Universal2: 支持 Intel (x86_64) 和 Apple Silicon (arm64)/" build_exe_mac.spec
+        # 确保 spec 文件使用 Universal2 架构
+        # 验证 spec 文件语法正确性（在修改前）
+        echo "=== Validating spec file before build ==="
+        python3 << 'EOF'
+import sys
+try:
+    with open('build_exe_mac.spec', 'r', encoding='utf-8') as f:
+        content = f.read()
+    compile(content, 'build_exe_mac.spec', 'exec')
+    print("✓ Spec file syntax is valid")
+except SyntaxError as e:
+    print(f"❌ Syntax error in spec file: {e}")
+    print(f"Line {e.lineno}: {e.text}")
+    sys.exit(1)
+except Exception as e:
+    print(f"❌ Error reading spec file: {e}")
+    sys.exit(1)
+EOF
+        
+        # 检查 target_arch 配置
+        if grep -q "target_arch='universal2'" build_exe_mac.spec; then
+          echo "✓ Spec file already configured for universal2"
+        else
+          echo "⚠ Warning: Spec file may not be configured for universal2"
+          echo "Current target_arch setting:"
+          grep "target_arch" build_exe_mac.spec || echo "  Not found"
+        fi
         
         # 验证环境变量
         echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
@@ -161,6 +186,20 @@ jobs:
           echo "This will cause compatibility issues on macOS 12.7"
           exit 1
         fi
+        
+        # 最终验证 spec 文件
+        echo "=== Final spec file validation ==="
+        python3 -m py_compile build_exe_mac.spec || {
+          echo "❌ Error: Spec file has syntax errors"
+          echo "First 10 lines of spec file:"
+          head -10 build_exe_mac.spec
+          exit 1
+        }
+        echo "✓ Spec file syntax is valid"
+        
+        # 显示 target_arch 配置
+        echo "=== Checking target_arch configuration ==="
+        grep "target_arch" build_exe_mac.spec || echo "⚠ Warning: target_arch not found"
         
         pyinstaller build_exe_mac.spec
         
