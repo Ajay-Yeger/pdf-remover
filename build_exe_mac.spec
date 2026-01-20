@@ -171,8 +171,13 @@ app = BUNDLE(
     bundle_identifier='com.yourcompany.pdfprocessor',  # 应用标识符，建议修改为你的唯一标识
     version=None,  # 应用版本号，例如: '1.0.0'
     info_plist={
+        'CFBundleExecutable': 'PDF处理器',  # 可执行文件名
+        'CFBundlePackageType': 'APPL',  # 应用包类型
+        'CFBundleName': 'PDF处理器',  # 应用名称
+        'CFBundleIdentifier': 'com.yourcompany.pdfprocessor',  # 应用标识符
         'NSHighResolutionCapable': 'True',  # 支持高分辨率显示
         'NSRequiresAquaSystemAppearance': 'False',  # 支持深色模式
         'LSMinimumSystemVersion': '12.0',  # 最低支持的 macOS 版本 (Monterey 12.0+)
+        'NSPrincipalClass': 'NSApplication',  # 主类（GUI应用必需）
     },
 )
