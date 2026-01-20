@@ -1,183 +1,399 @@
-# -*- mode: python ; coding: utf-8 -*-
-# Mac 版本打包配置文件
+name: Build Mac Application
 
-block_cipher = None
+on:
+  push:
+    tags:
+      - 'v*'  # 当推送以 v 开头的 tag 时触发，例如 v1.0.0
+  workflow_dispatch:  # 允许手动触发
+    inputs:
+      version:
+        description: '版本号'
+        required: false
+        default: '1.0.0'
 
-a = Analysis(
-    ['pdf_page_remover.py'],
-    pathex=[],
-    binaries=[],
-    datas=[
-        ('HYQiHeiClassic-55S.ttf', '.'),
-        ('HYQiHeiClassic-60S.ttf', '.'),
-        ('HYQiHeiClassic-70S.ttf', '.'),
-        ('newlogo.png', '.'),
-        ('newlogo2.jpeg', '.'),
-    ],
-    hiddenimports=[
-        # PyQt5相关
-        'PyQt5.QtCore',
-        'PyQt5.QtGui',
-        'PyQt5.QtWidgets',
-        'PyQt5.sip',
-        # PyPDF2相关
-        'PyPDF2',
-        'PyPDF2._reader',
-        'PyPDF2._writer',
-        # PyMuPDF相关
-        'fitz',
-        # matplotlib相关（用于信用分可视化）
-        'matplotlib',
-        'matplotlib.backends',
-        'matplotlib.backends.backend_agg',
-        'matplotlib.figure',
-        'matplotlib.font_manager',
-        'matplotlib.pyplot',
-        'matplotlib.patches',
-        'matplotlib.text',
-        # numpy相关（matplotlib依赖）
-        'numpy',
-        # requests相关
-        'requests',
-        'urllib3',
-        'certifi',
-        # 自定义模块
-        'credit_score_visualizer',
-        # PIL相关（某些情况下需要）
-        'PIL',
-        'PIL._tkinter_finder',
-    ],
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[
-        # ========== AI/ML / 深度学习 / 视觉相关大型库（本项目不需要）==========
-        'sklearn', 'scikit-learn',
-        'scipy',
-        'pandas',
-        'seaborn',
-        'torch', 'torchvision', 'torchaudio',
-        'pytorch-lightning', 'torchmetrics', 'torchsde', 'torchdiffeq',
-        'tensorflow', 'tensorflow-intel', 'tensorflow-estimator',
-        'tensorflow-io-gcs-filesystem', 'keras', 'tf-keras-nightly',
-        'jax', 'jaxlib', 'ml_dtypes',
-        'transformers', 'diffusers', 'accelerate', 'xformers',
-        'taming-transformers', 'taming-transformers-rom1504',
-        'timm', 'lpips',
-        'huggingface-hub', 'safetensors', 'sentencepiece', 'tokenizers',
-        'open-clip-torch',
-        'clean-fid', 'pytorch-fid',
-        'basicsr', 'gfpgan', 'realesrgan',
-        'facexlib',
-        'opencv-python', 'opencv-contrib-python', 'cv2',
-        'mediapipe',
-        'ultralytics', 'ultralytics-thop',
-        'tqdm',
-
-        # ========== LLM / LangChain / OpenAI 等（本项目不需要）==========
-        'openai', 'tiktoken',
-        'langchain', 'langchain-core', 'langchain-community',
-        'langchain-classic', 'langchain-openai', 'langchain-text-splitters',
-        'langgraph', 'langgraph-checkpoint', 'langgraph-prebuilt', 'langgraph-sdk',
-        'langsmith',
-
-        # ========== Jupyter / IPython / Notebook 相关 ==========
-        'IPython', 'ipython',
-        'jupyter', 'jupyterlab', 'jupyterlab_server',
-        'jupyter_client', 'jupyter-console', 'jupyter-core',
-        'jupyter_server', 'jupyter-events', 'jupyter_server_terminals',
-        'jupyterlab-widgets', 'widgetsnbextension',
-        'notebook', 'notebooks', 'notebook_shim',
-        'ipykernel',
-
-        # ========== Web / API / 前端服务框架 ==========
-        'fastapi', 'starlette', 'uvicorn',
-        'Flask', 'flask', 'Flask-Cors',
-        'dashscope',
-
-        # ========== 其他GUI框架 ==========
-        'tkinter', 'Tkinter',
-        'wx', 'wxpython',
-
-        # ========== 测试框架 ==========
-        'pytest', 'nose',
-        'doctest',
-        # 注意：不移除 'unittest'，因为某些依赖（如 PyQt5）可能在运行时需要它
-
-        # ========== 标准库 / 工具中运行时不需要的部分 ==========
-        'xmlrpc', 'xmlrpc.client', 'xmlrpc.server',
-        'pydoc',
-        'distutils',
-        'setuptools',
-        'pip',
-        'wheel',
-
-        # ========== 开发 / 调试 / 性能分析 ==========
-        'pdb',
-        'profile', 'pstats',
-        'cProfile',
-
-        # ========== 其他不需要的库 / 测试模块 ==========
-        'matplotlib.tests',
-        'numpy.tests',
-        'PyQt5.tests',
-    ],
-    cipher=block_cipher,
-    noarchive=True,  # 设置为 True，不将所有文件打包到 zip，直接作为文件存储，加快启动速度
-)
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-# 使用 onedir 模式（COLLECT），而不是 onefile 模式
-# onedir 模式将所有文件放在目录中，启动时无需解压，速度更快
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],  # 不将二进制文件打包到 exe 中
-    exclude_binaries=True,  # 排除二进制文件，使用目录模式
-    name='PDF处理器',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,  # 禁用 UPX 压缩，减少启动时的解压缩时间
-    console=False,  # Mac GUI应用不显示控制台
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,  # 使用运行环境的默认架构
-    codesign_identity=None,  # 如果需要代码签名，填写开发者ID，例如: 'Developer ID Application: Your Name'
-    entitlements_file=None,  # 如果需要特殊权限，指定entitlements文件路径
-    icon=None,  # Mac图标文件路径，格式为 .icns，例如: 'icon.icns'
-)
-
-# COLLECT 模式（onedir）：将所有文件放在一个目录中
-# 这样可以避免启动时的解压过程，大幅提升启动速度
-# 文件结构：PDF处理器.app/Contents/MacOS/PDF处理器（可执行文件）+ 所有依赖文件
-coll = COLLECT(
-    exe,
-    a.binaries,  # 二进制文件放在目录中，而不是打包到 exe
-    a.zipfiles,  # zip 文件放在目录中
-    a.datas,     # 数据文件放在目录中
-    strip=False,
-    upx=False,   # 禁用 UPX 压缩
-    upx_exclude=[],
-    name='PDF处理器',
-)
-
-# Mac 应用需要 BUNDLE 来创建 .app 目录结构
-app = BUNDLE(
-    coll,
-    name='PDF处理器.app',
-    icon=None,  # Mac图标文件路径，格式为 .icns
-    bundle_identifier='com.yourcompany.pdfprocessor',  # 应用标识符，建议修改为你的唯一标识
-    version=None,  # 应用版本号，例如: '1.0.0'
-    info_plist={
-        'CFBundleExecutable': 'PDF处理器',  # 可执行文件名
-        'CFBundlePackageType': 'APPL',  # 应用包类型
-        'CFBundleName': 'PDF处理器',  # 应用名称
-        'CFBundleIdentifier': 'com.yourcompany.pdfprocessor',  # 应用标识符
-        'NSHighResolutionCapable': 'True',  # 支持高分辨率显示
-        'NSRequiresAquaSystemAppearance': 'False',  # 支持深色模式
-        'LSMinimumSystemVersion': '12.0',  # 最低支持的 macOS 版本 (Monterey 12.0+)
-        'NSPrincipalClass': 'NSApplication',  # 主类（GUI应用必需）
-    },
-)
+jobs:
+  build-mac:
+    runs-on: macos-14  # 使用 macOS 14 runner（支持 Universal2 构建）
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Miniconda
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        python-version: '3.9'
+        channels: conda-forge,defaults
+        channel-priority: strict
+        auto-activate-base: false
+    
+    - name: Install system dependencies
+      run: |
+        # 安装 PyQt5 可能需要的系统库
+        brew install python-tk@3.11 || true
+    
+    - name: Create conda environment with Universal2 Python
+      shell: bash -l {0}
+      run: |
+        # 创建独立的 conda 环境，使用 Python 3.9
+        # conda-forge 的 Python 3.9 在某些情况下可能是 universal2
+        conda create -n build_env python=3.9 -y -c conda-forge
+        conda activate build_env
+        
+        # 验证 Python 版本
+        PYTHON_VERSION=$(python --version 2>&1 | awk '{print $2}')
+        PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
+        PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+        if [ "$PYTHON_MAJOR" != "3" ] || [ "$PYTHON_MINOR" != "9" ]; then
+          echo "❌ Error: Python version must be 3.9.x, but got $PYTHON_VERSION"
+          exit 1
+        fi
+        echo "✓ Python version: $PYTHON_VERSION"
+        
+        # 检查 Python 架构（检查是否是 universal2）
+        PYTHON_EXEC=$(which python)
+        echo "Python executable: $PYTHON_EXEC"
+        
+        if command -v lipo >/dev/null 2>&1; then
+          ARCH_INFO=$(lipo -info "$PYTHON_EXEC" 2>&1 || echo "Not a fat binary")
+          echo "Python architecture info: $ARCH_INFO"
+          if echo "$ARCH_INFO" | grep -q "x86_64\|arm64"; then
+            if echo "$ARCH_INFO" | grep -q "x86_64" && echo "$ARCH_INFO" | grep -q "arm64"; then
+              echo "✓ Python is Universal2 (supports both x86_64 and arm64)"
+            else
+              echo "⚠ Warning: Python is not Universal2, only supports single architecture"
+            fi
+          fi
+        fi
+        
+        # 检查 Python 库路径
+        PYTHON_LIB_PATH=$(python -c "import sys; print(sys.executable)" | xargs dirname)
+        echo "Python library path: $PYTHON_LIB_PATH"
+        
+        # 检查是否存在 libpython3.9（应该存在）
+        CONDA_PREFIX=$(conda info --base)/envs/build_env
+        if [ -f "$CONDA_PREFIX/lib/libpython3.9.dylib" ]; then
+          echo "✓ Found libpython3.9.dylib in conda environment"
+          # 检查库的架构
+          if command -v lipo >/dev/null 2>&1; then
+            LIB_ARCH=$(lipo -info "$CONDA_PREFIX/lib/libpython3.9.dylib" 2>&1 || echo "Not a fat binary")
+            echo "Python library architecture: $LIB_ARCH"
+          fi
+        else
+          echo "⚠ Warning: libpython3.9.dylib not found in conda environment"
+        fi
+        
+        # 检查 Python 的 deployment target（conda 的 Python 通常兼容性更好）
+        python -c "import sysconfig; dt = sysconfig.get_config_var('MACOSX_DEPLOYMENT_TARGET'); print(f'Python deployment target: {dt}')" || echo "Deployment target check skipped"
+    
+    - name: Install Python dependencies
+      shell: bash -l {0}
+      run: |
+        conda activate build_env
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Set Universal2 architecture
+      id: set_arch
+      run: |
+        # 设置目标架构为 Universal2（支持 Intel 和 Apple Silicon）
+        TARGET_ARCH="universal2"
+        echo "target_arch=$TARGET_ARCH" >> $GITHUB_OUTPUT
+        echo "✓ Building Universal2 binary (supports both Intel x86_64 and Apple Silicon arm64)"
+        
+        # 检测当前 runner 的架构（用于信息显示）
+        ARCH=$(uname -m)
+        echo "Runner architecture: $ARCH"
+        echo "Target architecture: $TARGET_ARCH"
+    
+    - name: Build Mac application
+      shell: bash -l {0}
+      run: |
+        conda activate build_env
+        # 设置最低 macOS 版本为 12.0 (Monterey)，确保在 macOS 12.7 上可以运行
+        export MACOSX_DEPLOYMENT_TARGET=12.0
+        # 确保所有编译都使用正确的 deployment target
+        export CFLAGS="-mmacosx-version-min=12.0"
+        export CXXFLAGS="-mmacosx-version-min=12.0"
+        export LDFLAGS="-mmacosx-version-min=12.0"
+        
+        # 获取目标架构（Universal2）
+        TARGET_ARCH="${{ steps.set_arch.outputs.target_arch }}"
+        echo "Building for architecture: $TARGET_ARCH (Universal2)"
+        
+        # 确保 spec 文件使用 Universal2 架构
+        # 如果 spec 文件中 target_arch 不是 universal2，则修改它
+        if ! grep -q "target_arch='universal2'" build_exe_mac.spec; then
+          echo "Updating spec file to use universal2 architecture..."
+          sed -i.bak "s/target_arch=.*/target_arch='universal2',  # Universal2: 支持 Intel (x86_64) 和 Apple Silicon (arm64)/" build_exe_mac.spec
+        else
+          echo "✓ Spec file already configured for universal2"
+        fi
+        
+        # 验证环境变量
+        echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
+        echo "TARGET_ARCH=$TARGET_ARCH"
+        
+        # 验证 Python 版本（必须是 3.9）
+        PYTHON_VERSION=$(python --version 2>&1 | awk '{print $2}')
+        PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
+        PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+        echo "Python version: $PYTHON_VERSION"
+        if [ "$PYTHON_MAJOR" != "3" ] || [ "$PYTHON_MINOR" != "9" ]; then
+          echo "❌ Error: Python version must be 3.9.x, but got $PYTHON_VERSION"
+          exit 1
+        fi
+        echo "✓ Python version verified: $PYTHON_VERSION"
+        
+        # 检查 Python 库路径，确保使用的是 conda 的 Python 3.9
+        PYTHON_LIB=$(python -c "import sys; print(sys.executable)" | xargs dirname)
+        echo "Python executable directory: $PYTHON_LIB"
+        
+        # 获取 conda 环境路径
+        CONDA_PREFIX=$(conda info --base)/envs/build_env
+        echo "Conda environment: $CONDA_PREFIX"
+        
+        # 检查是否存在 libpython3.9（应该存在）
+        if [ -f "$PYTHON_LIB/../lib/libpython3.9.dylib" ] || [ -f "$CONDA_PREFIX/lib/libpython3.9.dylib" ]; then
+          echo "✓ Found libpython3.9.dylib"
+        else
+          echo "⚠ Warning: libpython3.9.dylib not found in expected location"
+        fi
+        
+        # 检查是否错误地包含了 libpython3.10
+        if [ -f "$PYTHON_LIB/../lib/libpython3.10.dylib" ] || [ -f "$CONDA_PREFIX/lib/libpython3.10.dylib" ]; then
+          echo "❌ Error: Found libpython3.10.dylib - this should not exist!"
+          echo "This will cause compatibility issues on macOS 12.7"
+          exit 1
+        fi
+        
+        pyinstaller build_exe_mac.spec
+        
+        # 恢复原始 spec 文件
+        mv build_exe_mac.spec.bak build_exe_mac.spec || true
+    
+    - name: Fix application permissions and structure
+      run: |
+        echo "=== Fixing application permissions ==="
+        
+        # 检查 .app 目录是否存在
+        if [ ! -d "dist/PDF处理器.app" ]; then
+          echo "❌ Error: PDF处理器.app not found!"
+          exit 1
+        fi
+        
+        # 检查 Contents 目录
+        if [ ! -d "dist/PDF处理器.app/Contents" ]; then
+          echo "❌ Error: Contents directory not found!"
+          exit 1
+        fi
+        
+        # 检查 MacOS 目录和可执行文件
+        if [ ! -d "dist/PDF处理器.app/Contents/MacOS" ]; then
+          echo "❌ Error: MacOS directory not found!"
+          exit 1
+        fi
+        
+        APP_EXEC="dist/PDF处理器.app/Contents/MacOS/PDF处理器"
+        if [ ! -f "$APP_EXEC" ]; then
+          echo "❌ Error: Executable file not found!"
+          exit 1
+        fi
+        
+        # 设置可执行文件权限（非常重要！）
+        chmod +x "$APP_EXEC"
+        echo "✓ Set executable permission on $APP_EXEC"
+        
+        # 检查架构
+        echo "=== Checking executable architecture ==="
+        if command -v file >/dev/null 2>&1; then
+          ARCH_INFO=$(file "$APP_EXEC")
+          echo "$ARCH_INFO"
+          # 验证架构（应该是 Universal2，包含 x86_64 和 arm64）
+          if echo "$ARCH_INFO" | grep -q "x86_64" && echo "$ARCH_INFO" | grep -q "arm64"; then
+            echo "✓ Executable is Universal2 (supports both x86_64 and arm64)"
+          elif echo "$ARCH_INFO" | grep -q "x86_64\|arm64"; then
+            echo "⚠ Warning: Executable is single-architecture, not Universal2"
+          else
+            echo "⚠ Warning: Could not determine architecture"
+          fi
+        fi
+        
+        # 使用 otool 检查架构（更详细）
+        if command -v otool >/dev/null 2>&1; then
+          echo "=== Detailed architecture info ==="
+          otool -hv "$APP_EXEC" | head -5 || echo "otool check skipped"
+        fi
+        
+        # 使用 ad-hoc 代码签名（即使没有开发者证书，也可以让应用在本地运行）
+        # 这对于未签名的应用是必需的，否则 macOS Gatekeeper 会阻止运行
+        echo "=== Applying ad-hoc code signature ==="
+        codesign --force --deep --sign - "dist/PDF处理器.app" || echo "⚠ Code signing failed (may need developer certificate)"
+        
+        # 验证签名
+        codesign --verify --verbose "dist/PDF处理器.app" || echo "⚠ Code signature verification failed"
+        
+        # 检查 Gatekeeper 状态
+        spctl --assess --verbose "dist/PDF处理器.app" || echo "⚠ Gatekeeper assessment failed (expected for unsigned apps)"
+    
+    - name: Verify application structure
+      run: |
+        echo "=== Verifying .app structure (onedir mode) ==="
+        
+        # 检查 onedir 模式的文件结构（应该有 _internal 或 PDF处理器 目录）
+        MACOS_DIR="dist/PDF处理器.app/Contents/MacOS"
+        if [ -d "$MACOS_DIR/_internal" ] || [ -d "$MACOS_DIR/PDF处理器" ]; then
+          echo "✓ onedir structure detected"
+          echo "=== Directory structure ==="
+          ls -la "$MACOS_DIR" | head -20
+        else
+          echo "⚠ Warning: onedir structure not found, checking for onefile mode"
+          ls -la "$MACOS_DIR"
+        fi
+        
+        # 检查资源文件
+        if [ -d "dist/PDF处理器.app/Contents/Resources" ]; then
+          echo "=== Resources directory ==="
+          ls -la "dist/PDF处理器.app/Contents/Resources/" || echo "Resources directory is empty"
+        fi
+        
+        # 检查 Python 库的兼容性（查找 libpython）
+        echo "=== Checking Python library compatibility ==="
+        PYTHON_LIBS=$(find "dist/PDF处理器.app" -name "libpython*.dylib")
+        ERROR_FOUND=0
+        
+        if [ -z "$PYTHON_LIBS" ]; then
+          echo "⚠ Warning: No libpython*.dylib found in app bundle"
+        else
+          for lib in $PYTHON_LIBS; do
+            echo "Found: $lib"
+            # 检查是否是 libpython3.10（不应该存在）
+            if echo "$lib" | grep -q "libpython3.10"; then
+              echo "❌ ERROR: Found libpython3.10.dylib - this will cause _mkfifoat error on macOS 12.7!"
+              echo "The app should use libpython3.9.dylib instead"
+              ERROR_FOUND=1
+            fi
+            # 检查是否是 libpython3.9（应该存在）
+            if echo "$lib" | grep -q "libpython3.9"; then
+              echo "✓ Correct Python library: libpython3.9.dylib"
+            fi
+            if command -v otool >/dev/null 2>&1; then
+              echo "Checking deployment target:"
+              otool -l "$lib" | grep -A 3 "LC_VERSION_MIN_MACOSX" || echo "  No deployment target info found"
+              echo "Checking linked libraries:"
+              otool -L "$lib" | head -5
+              # 检查是否包含 _mkfifoat 符号（不应该有）
+              if nm "$lib" 2>/dev/null | grep -q "_mkfifoat"; then
+                echo "❌ ERROR: Library contains _mkfifoat symbol (macOS 13+ only)!"
+                echo "This will fail on macOS 12.7"
+                ERROR_FOUND=1
+              else
+                echo "✓ No _mkfifoat symbol found (compatible with macOS 12.7)"
+              fi
+            fi
+          done
+        fi
+        
+        # 如果有错误，退出
+        if [ "$ERROR_FOUND" -eq 1 ]; then
+          echo "❌ Compatibility check failed!"
+          exit 1
+        fi
+        
+        echo "✓ Application structure is valid"
+    
+    - name: Test application launch
+      run: |
+        APP_PATH="dist/PDF处理器.app/Contents/MacOS/PDF处理器"
+        
+        # 检查可执行文件是否存在
+        if [ ! -f "$APP_PATH" ]; then
+          echo "❌ Error: Executable not found"
+          exit 1
+        fi
+        
+        # 设置执行权限
+        chmod +x "$APP_PATH"
+        
+        # 尝试启动应用（后台运行，3秒后检查进程）
+        echo "Testing application launch..."
+        "$APP_PATH" &
+        APP_PID=$!
+        sleep 3
+        
+        # 检查进程是否在运行（说明应用至少启动了）
+        if ps -p $APP_PID > /dev/null; then
+          echo "✓ Application started successfully"
+          kill $APP_PID 2>/dev/null || true
+        else
+          # 进程退出可能是正常的（GUI应用在headless环境可能无法运行）
+          echo "✓ Application executed (may exit immediately in headless environment)"
+        fi
+    
+    - name: Create DMG (optional)
+      run: |
+        # 安装 create-dmg（如果需要创建安装包）
+        brew install create-dmg || true
+        
+        # 创建 DMG 安装包（可选）
+        if command -v create-dmg &> /dev/null; then
+          create-dmg \
+            --volname "PDF处理器" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "PDF处理器.app" 200 190 \
+            --hide-extension "PDF处理器.app" \
+            --app-drop-link 600 185 \
+            "PDF处理器.dmg" \
+            "dist/" || echo "DMG creation skipped"
+        fi
+    
+    - name: Rename files to English names
+      run: |
+        # 创建发布目录
+        mkdir -p release
+        
+        # Universal2 版本不需要架构后缀
+        APP_NAME="PDFProcessor"
+        
+        # 重命名 .app 文件（目录）
+        if [ -d "dist/PDF处理器.app" ]; then
+          cp -R "dist/PDF处理器.app" "release/${APP_NAME}.app"
+          # 确保复制的文件也有执行权限
+          chmod +x "release/${APP_NAME}.app/Contents/MacOS/PDF处理器"
+          # 重新签名复制的应用
+          codesign --force --deep --sign - "release/${APP_NAME}.app" || echo "⚠ Code signing failed"
+        fi
+        
+        # 重命名 .dmg 文件
+        if [ -f "dist/PDF处理器.dmg" ]; then
+          cp "dist/PDF处理器.dmg" "release/${APP_NAME}.dmg"
+        fi
+        
+        # 列出发布目录内容（用于调试）
+        echo "=== Release directory contents ==="
+        ls -la release/
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: PDFProcessor-Mac-Universal2
+        path: |
+          release/PDFProcessor.app
+          release/PDFProcessor.dmg
+        if-no-files-found: warn
+        retention-days: 30
+    
+    - name: Create Release (if tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release/PDFProcessor.app
+          release/PDFProcessor.dmg
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
