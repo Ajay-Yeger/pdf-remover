@@ -144,6 +144,10 @@ jobs:
         PYTHON_LIB=$(python -c "import sys; print(sys.executable)" | xargs dirname)
         echo "Python executable directory: $PYTHON_LIB"
         
+        # 获取 conda 环境路径
+        CONDA_PREFIX=$(conda info --base)/envs/build_env
+        echo "Conda environment: $CONDA_PREFIX"
+        
         # 检查是否存在 libpython3.9（应该存在）
         if [ -f "$PYTHON_LIB/../lib/libpython3.9.dylib" ] || [ -f "$CONDA_PREFIX/lib/libpython3.9.dylib" ]; then
           echo "✓ Found libpython3.9.dylib"
@@ -251,16 +255,18 @@ jobs:
         # 检查 Python 库的兼容性（查找 libpython）
         echo "=== Checking Python library compatibility ==="
         PYTHON_LIBS=$(find "dist/PDF处理器.app" -name "libpython*.dylib")
+        ERROR_FOUND=0
+        
         if [ -z "$PYTHON_LIBS" ]; then
           echo "⚠ Warning: No libpython*.dylib found in app bundle"
         else
-          echo "$PYTHON_LIBS" | while read lib; do
+          for lib in $PYTHON_LIBS; do
             echo "Found: $lib"
             # 检查是否是 libpython3.10（不应该存在）
             if echo "$lib" | grep -q "libpython3.10"; then
               echo "❌ ERROR: Found libpython3.10.dylib - this will cause _mkfifoat error on macOS 12.7!"
               echo "The app should use libpython3.9.dylib instead"
-              exit 1
+              ERROR_FOUND=1
             fi
             # 检查是否是 libpython3.9（应该存在）
             if echo "$lib" | grep -q "libpython3.9"; then
@@ -275,12 +281,18 @@ jobs:
               if nm "$lib" 2>/dev/null | grep -q "_mkfifoat"; then
                 echo "❌ ERROR: Library contains _mkfifoat symbol (macOS 13+ only)!"
                 echo "This will fail on macOS 12.7"
-                exit 1
+                ERROR_FOUND=1
               else
                 echo "✓ No _mkfifoat symbol found (compatible with macOS 12.7)"
               fi
             fi
           done
+        fi
+        
+        # 如果有错误，退出
+        if [ "$ERROR_FOUND" -eq 1 ]; then
+          echo "❌ Compatibility check failed!"
+          exit 1
         fi
         
         echo "✓ Application structure is valid"
@@ -351,7 +363,7 @@ jobs:
         
         # 重命名 .dmg 文件
         if [ -f "dist/PDF处理器.dmg" ]; then
-          cp "dist/PDF处理器.dmg" "release/PDFProcessor${ARCH_SUFFIX}.dmg"
+          cp "dist/PDF处理器.dmg" "release/${APP_NAME}.dmg"
         fi
         
         # 列出发布目录内容（用于调试）
