@@ -18,10 +18,12 @@ jobs:
         arch: [intel, apple-silicon]
         include:
           - arch: intel
-            runner: macos-15-intel  # Intel 架构 (x86_64)
+            runner: macos-13  # Intel 架构 (x86_64)，使用 macOS 13 以更好兼容 macOS 12.7
+            # 注意：macOS 13 runner 将在 2025年12月4日退役，在此之前可能偶尔失败
             suffix: -Intel
           - arch: apple-silicon
-            runner: macos-latest  # Apple Silicon 架构 (arm64)
+            runner: macos-13  # Apple Silicon 架构 (arm64)，使用 macOS 13 以更好兼容 macOS 12.7
+            # 注意：macOS 13 runner 将在 2025年12月4日退役，在此之前可能偶尔失败
             suffix: -AppleSilicon
     runs-on: ${{ matrix.runner }}
     
@@ -29,33 +31,48 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Set up Miniconda
+      uses: conda-incubator/setup-miniconda@v3
       with:
-        python-version: '3.10'  # 根据需要调整 Python 版本
+        python-version: '3.10'
+        channels: conda-forge,defaults
+        channel-priority: strict
+        auto-activate-base: false
     
     - name: Install system dependencies
       run: |
         # 安装 PyQt5 可能需要的系统库
         brew install python-tk@3.11 || true
     
-    - name: Create virtual environment
+    - name: Create conda environment
+      shell: bash -l {0}
       run: |
-        python3 -m venv venv
-        source venv/bin/activate
+        conda create -n build_env python=3.10 -y
+        conda activate build_env
+        python --version
+        # 检查 Python 的 deployment target（conda 的 Python 通常兼容性更好）
+        python -c "import sysconfig; dt = sysconfig.get_config_var('MACOSX_DEPLOYMENT_TARGET'); print(f'Python deployment target: {dt}')" || echo "Deployment target check skipped"
     
     - name: Install Python dependencies
+      shell: bash -l {0}
       run: |
-        source venv/bin/activate
+        conda activate build_env
         pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
     
     - name: Build Mac application
+      shell: bash -l {0}
       run: |
-        source venv/bin/activate
-        # 设置最低 macOS 版本为 10.15 (Catalina)，以支持较老的系统
-        export MACOSX_DEPLOYMENT_TARGET=10.15
+        conda activate build_env
+        # 设置最低 macOS 版本为 12.0 (Monterey)，确保在 macOS 12.7 上可以运行
+        export MACOSX_DEPLOYMENT_TARGET=12.0
+        # 确保所有编译都使用正确的 deployment target
+        export CFLAGS="-mmacosx-version-min=12.0"
+        export CXXFLAGS="-mmacosx-version-min=12.0"
+        export LDFLAGS="-mmacosx-version-min=12.0"
+        # 验证环境变量
+        echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
         pyinstaller build_exe_mac.spec
     
     - name: Verify application structure
@@ -102,6 +119,18 @@ jobs:
           echo "=== Resources directory ==="
           ls -la "dist/PDF处理器.app/Contents/Resources/" || echo "Resources directory is empty"
         fi
+        
+        # 检查 Python 库的兼容性（查找 libpython）
+        echo "=== Checking Python library compatibility ==="
+        find "dist/PDF处理器.app" -name "libpython*.dylib" -exec sh -c '
+          echo "Found: $1"
+          if command -v otool >/dev/null 2>&1; then
+            echo "Checking deployment target:"
+            otool -l "$1" | grep -A 3 "LC_VERSION_MIN_MACOSX" || echo "  No deployment target info found"
+            echo "Checking linked libraries:"
+            otool -L "$1" | head -5
+          fi
+        ' _ {} \;
         
         echo "✓ Application structure is valid"
     
