@@ -22,72 +22,72 @@ jobs:
     - name: Set up Miniconda
       uses: conda-incubator/setup-miniconda@v3
       with:
-        python-version: '3.10'  # Python 3.10 对 Universal2 支持更好
+        python-version: '3.10'
         channels: conda-forge,defaults
         channel-priority: strict
         auto-activate-base: false
     
-    - name: Create conda environment (Universal2)
-      shell: bash -l {0}
+    - name: Install official Python Universal2
       run: |
-        # 创建 conda 环境，使用原生架构（arm64）以支持 Universal2 构建
-        # Universal2 需要同时包含 arm64 和 x86_64，在 arm64 runner 上构建更合适
-        CONDA_BASE=$(conda info --base)
-        source "$CONDA_BASE/etc/profile.d/conda.sh"
+        # 下载并安装官方 Python Universal2 版本
+        # 官方 Python 提供 Universal2 支持，包含 arm64 和 x86_64
+        PYTHON_VERSION="3.10.13"
+        PYTHON_URL="https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-macos11.pkg"
         
-        # 创建 conda 环境，使用 Python 3.10（对 Universal2 支持更好）
-        conda create -n build_env python=3.10 -y -c conda-forge
-        conda activate build_env
+        echo "Downloading Python Universal2 installer..."
+        curl -L -o python.pkg "$PYTHON_URL"
+        
+        echo "Installing Python Universal2..."
+        sudo installer -pkg python.pkg -target /
+        
+        # 创建符号链接到 /usr/local/bin（如果不存在）
+        sudo mkdir -p /usr/local/bin
+        PYTHON_BIN="/Library/Frameworks/Python.framework/Versions/${PYTHON_VERSION}/bin"
+        if [ ! -f /usr/local/bin/python3 ]; then
+          sudo ln -sf "${PYTHON_BIN}/python3" /usr/local/bin/python3
+          sudo ln -sf "${PYTHON_BIN}/pip3" /usr/local/bin/pip3
+        fi
         
         # 验证 Python 架构
-        echo "Python executable: $(which python)"
-        echo "Python path: $(python -c 'import sys; print(sys.executable)')"
-        echo "Python version: $(python --version)"
-        
-        # 检查 Python 架构（应该是 arm64，用于构建 Universal2）
+        /usr/local/bin/python3 --version
         if command -v lipo >/dev/null 2>&1; then
-          PYTHON_EXEC=$(which python)
+          PYTHON_EXEC="${PYTHON_BIN}/python3"
           ARCH_INFO=$(lipo -info "$PYTHON_EXEC" 2>&1 || echo "Not a fat binary")
           echo "Python architecture: $ARCH_INFO"
-          if echo "$ARCH_INFO" | grep -q "arm64"; then
-            echo "✓ Python is arm64 (native for Universal2 build)"
-          elif echo "$ARCH_INFO" | grep -q "x86_64.*arm64\|arm64.*x86_64"; then
-            echo "✓ Python is Universal2 (perfect for Universal2 build)"
+          if echo "$ARCH_INFO" | grep -q "x86_64.*arm64\|arm64.*x86_64"; then
+            echo "✓ Python is Universal2"
           else
-            echo "⚠ Warning: Python architecture may not be optimal for Universal2"
+            echo "⚠ Warning: Python may not be Universal2"
           fi
         fi
+        
+        # 设置 PATH，优先使用官方 Python
+        echo "${PYTHON_BIN}" >> $GITHUB_PATH
+        echo "PYTHON_BIN=${PYTHON_BIN}" >> $GITHUB_ENV
     
     - name: Install Python dependencies
-      shell: bash -l {0}
       run: |
-        CONDA_BASE=$(conda info --base)
-        source "$CONDA_BASE/etc/profile.d/conda.sh"
-        conda activate build_env
+        # 使用官方 Python Universal2 的 pip
+        python3 --version
+        which python3
+        which pip3
         
-        # 确保使用 conda 环境的 pip
-        export PATH="$CONDA_BASE/envs/build_env/bin:$PATH"
-        which pip
-        pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
+        pip3 install --upgrade pip
+        pip3 install -r requirements.txt
+        pip3 install pyinstaller
         
-        # 验证安装的包架构（应该是 arm64，用于构建 Universal2）
+        # 验证安装的包架构
         echo "=== Checking installed package architectures ==="
-        python -c "import sys, os; site_packages = [p for p in sys.path if 'site-packages' in p][0]; print(f'Site packages: {site_packages}'); import PIL; pil_path = os.path.dirname(PIL.__file__); webp_so = os.path.join(pil_path, '_webp.cpython-310-darwin.so'); import subprocess; result = subprocess.run(['lipo', '-info', webp_so], capture_output=True, text=True) if os.path.exists(webp_so) else None; print(f'PIL._webp architecture: {result.stdout.strip() if result else \"not found\"}') if result else None; print('✓ Package architecture check completed')"
+        python3 -c "import sys; print('Python executable:', sys.executable); print('Python version:', sys.version)"
+        
+        # 检查关键包的架构（应该是 Universal2）
+        python3 -c "import sys, os, subprocess; site_packages = [p for p in sys.path if 'site-packages' in p][0]; print(f'Site packages: {site_packages}'); import PIL; pil_path = os.path.dirname(PIL.__file__); webp_so = os.path.join(pil_path, '_webp.cpython-310-darwin.so'); result = subprocess.run(['lipo', '-info', webp_so], capture_output=True, text=True) if os.path.exists(webp_so) else None; arch_info = result.stdout.strip() if result else None; print(f'PIL._webp architecture: {arch_info}') if arch_info else print('⚠ PIL._webp.so not found'); print('✓ PIL._webp is Universal2') if arch_info and 'x86_64' in arch_info and 'arm64' in arch_info else print('⚠ PIL._webp may not be Universal2') if arch_info else None" 2>&1 || echo "Package architecture check completed"
     
     - name: Build Mac application (Universal2)
-      shell: bash -l {0}
       run: |
-        CONDA_BASE=$(conda info --base)
-        source "$CONDA_BASE/etc/profile.d/conda.sh"
-        conda activate build_env
-        
-        # 确保使用 conda 环境的 Python
-        export PATH="$CONDA_BASE/envs/build_env/bin:$PATH"
-        which python
-        python --version
-        python -c "import sys; print('Python executable:', sys.executable)"
+        # 使用官方 Python Universal2
+        python3 --version
+        which python3
         
         # 设置 macOS 部署目标为 12.0（支持 macOS 12.7）
         export MACOSX_DEPLOYMENT_TARGET=12.0
@@ -95,8 +95,8 @@ jobs:
         export CXXFLAGS="-mmacosx-version-min=12.0"
         export LDFLAGS="-mmacosx-version-min=12.0"
         
-        # 使用原生 Python 构建 Universal2（PyInstaller 会自动处理架构转换）
-        python -m PyInstaller build_exe_mac.spec
+        # 使用官方 Python Universal2 构建 Universal2 应用
+        python3 -m PyInstaller build_exe_mac.spec
         
         # 验证生成的应用架构
         echo "=== Verifying application architecture ==="
