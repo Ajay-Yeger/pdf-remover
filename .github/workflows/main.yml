@@ -3,8 +3,8 @@ name: Build Mac Application
 on:
   push:
     tags:
-      - 'v*'  # 当推送以 v 开头的 tag 时触发，例如 v1.0.0
-  workflow_dispatch:  # 允许手动触发
+      - 'v*'
+  workflow_dispatch:
     inputs:
       version:
         description: '版本号'
@@ -12,48 +12,43 @@ on:
         default: '1.0.0'
 
 jobs:
-  build-mac:
-    runs-on: macos-14  # 使用 macOS 14 runner（支持 Universal2 构建）
-    
+  build-mac-intel:
+    runs-on: macos-14  # 最新 macOS runner，兼容 Intel
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
-    - name: Setup Python
+
+    - name: Setup Python 3.9 Intel
       uses: actions/setup-python@v5
       with:
-        python-version: 3.9.23
-        architecture: universal2
+        python-version: 3.9.16  # 官方缓存里 Intel 3.9 有效版本
+        architecture: x64       # Intel 架构
 
-    
     - name: Install Python dependencies
       run: |
-        pip install --upgrade pip
+        python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
-    
+
     - name: Build Mac application
       run: |
         export MACOSX_DEPLOYMENT_TARGET=12.0
         export CFLAGS="-mmacosx-version-min=12.0"
         export CXXFLAGS="-mmacosx-version-min=12.0"
         export LDFLAGS="-mmacosx-version-min=12.0"
-        
+
         pyinstaller build_exe_mac.spec
-    
-    - name: Fix application permissions and structure
+
+    - name: Fix application permissions
       run: |
         APP_EXEC="dist/PDF处理器.app/Contents/MacOS/PDF处理器"
         chmod +x "$APP_EXEC"
         codesign --force --deep --sign - "dist/PDF处理器.app" || true
-    
-    
+
     - name: Create DMG (optional)
       run: |
-        # 安装 create-dmg（如果需要创建安装包）
         brew install create-dmg || true
-        
-        # 创建 DMG 安装包（可选）
         if command -v create-dmg &> /dev/null; then
           create-dmg \
             --volname "PDF处理器" \
@@ -66,26 +61,26 @@ jobs:
             "PDF处理器.dmg" \
             "dist/" || echo "DMG creation skipped"
         fi
-    
-    - name: Rename files to English names
+
+    - name: Rename files to English
       run: |
         mkdir -p release
         cp -R "dist/PDF处理器.app" "release/PDFProcessor.app"
         chmod +x "release/PDFProcessor.app/Contents/MacOS/PDF处理器"
         codesign --force --deep --sign - "release/PDFProcessor.app" || true
         [ -f "dist/PDF处理器.dmg" ] && cp "dist/PDF处理器.dmg" "release/PDFProcessor.dmg"
-    
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: PDFProcessor-Mac-Universal2
+        name: PDFProcessor-Mac-Intel
         path: |
           release/PDFProcessor.app
           release/PDFProcessor.dmg
         if-no-files-found: warn
         retention-days: 30
-    
-    - name: Create Release (if tag)
+
+    - name: Create GitHub Release (if tag)
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
