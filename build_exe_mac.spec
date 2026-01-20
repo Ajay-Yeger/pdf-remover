@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Mac 版本打包配置文件
+# Mac 版本打包配置文件 - macOS 12.7 Intel (x86_64) 架构
 
 block_cipher = None
 
@@ -130,6 +130,7 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 # 使用 onedir 模式（COLLECT），而不是 onefile 模式
 # onedir 模式将所有文件放在目录中，启动时无需解压，速度更快
+# 目标架构：Intel x86_64（适用于 macOS 12.7 Intel Mac）
 exe = EXE(
     pyz,
     a.scripts,
@@ -143,7 +144,7 @@ exe = EXE(
     console=False,  # Mac GUI应用不显示控制台
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch='universal2',  # Universal2: 支持 Intel (x86_64) 和 Apple Silicon (arm64)
+    target_arch='x86_64',  # Intel 架构：适用于 macOS 12.7 Intel Mac
     codesign_identity=None,  # 如果需要代码签名，填写开发者ID，例如: 'Developer ID Application: Your Name'
     entitlements_file=None,  # 如果需要特殊权限，指定entitlements文件路径
     icon=None,  # Mac图标文件路径，格式为 .icns，例如: 'icon.icns'
