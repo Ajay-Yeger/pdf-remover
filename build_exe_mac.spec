@@ -173,6 +173,6 @@ app = BUNDLE(
     info_plist={
         'NSHighResolutionCapable': 'True',  # 支持高分辨率显示
         'NSRequiresAquaSystemAppearance': 'False',  # 支持深色模式
-        'LSMinimumSystemVersion': '10.15',  # 最低支持的 macOS 版本 (Catalina)
+        'LSMinimumSystemVersion': '12.0',  # 最低支持的 macOS 版本 (Monterey 12.0+)
     },
 )
