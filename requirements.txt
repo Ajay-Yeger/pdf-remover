@@ -1,9 +1,11 @@
-# Python 3.9 兼容的依赖包版本
-matplotlib>=3.5.0,<4.0.0  # Python 3.9 支持到 3.9.x
-numpy>=1.21.0,<2.0.0  # Python 3.9 支持到 1.26.x
-PyQt5>=5.15.0,<6.0.0  # Python 3.9 完全支持
-PyPDF2>=3.0.0,<4.0.0  # Python 3.9 支持
-PyMuPDF>=1.23.0,<2.0.0  # Python 3.9 支持
-requests>=2.28.0,<3.0.0  # Python 3.9 支持
-pyinstaller>=5.0.0,<7.0.0  # Python 3.9 支持到 6.x
+# Python 3.9 Universal2 兼容的依赖包版本
+# 所有包都支持 Python 3.9 和 Universal2 架构（Intel x86_64 + Apple Silicon arm64）
+matplotlib>=3.5.0,<4.0.0  # Python 3.9 支持，Universal2 兼容
+numpy>=1.21.0,<2.0.0  # Python 3.9 支持到 1.26.x，Universal2 兼容
+PyQt5>=5.15.0,<6.0.0  # Python 3.9 完全支持，Universal2 兼容
+PyPDF2>=3.0.0,<4.0.0  # Python 3.9 支持，Universal2 兼容
+PyMuPDF>=1.23.0,<2.0.0  # Python 3.9 支持，Universal2 兼容
+requests>=2.28.0,<3.0.0  # Python 3.9 支持，Universal2 兼容
+Pillow>=9.0.0,<11.0.0  # PIL/Pillow，matplotlib 可能需要，Universal2 兼容
+pyinstaller>=5.0.0,<7.0.0  # Python 3.9 支持到 6.x，Universal2 支持
 
