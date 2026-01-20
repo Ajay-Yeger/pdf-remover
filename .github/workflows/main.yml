@@ -1,9 +1,9 @@
-name: Build Mac Intel Application
+name: Build Mac Application (Intel)
 
 on:
   push:
     tags:
-      - 'v*'  # 当推送以 v 开头的 tag 时触发，例如 v1.0.0
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -12,43 +12,40 @@ on:
         default: '1.0.0'
 
 jobs:
-  build-mac:
+  build-mac-intel:
     runs-on: macos-14
-
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Setup Python (Intel x86_64)
+    
+    - name: Setup Python
       uses: actions/setup-python@v5
       with:
-        python-version: 3.9
-        architecture: x64  # Intel 架构
-
-    - name: Upgrade pip and install dependencies
+        python-version: '3.9'
+    
+    - name: Install Python dependencies
       run: |
         pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
-
-    - name: Build Mac application
+    
+    - name: Build Mac application (Intel)
       run: |
-        # 设置最低 macOS 版本
         export MACOSX_DEPLOYMENT_TARGET=12.0
         export CFLAGS="-mmacosx-version-min=12.0"
         export CXXFLAGS="-mmacosx-version-min=12.0"
         export LDFLAGS="-mmacosx-version-min=12.0"
         
-        # 打包 .app（onedir 模式）
         pyinstaller build_exe_mac.spec
-
+    
     - name: Fix application permissions and code sign
       run: |
         APP_EXEC="dist/PDF处理器.app/Contents/MacOS/PDF处理器"
         chmod +x "$APP_EXEC"
         codesign --force --deep --sign - "dist/PDF处理器.app" || true
-
-    - name: Create DMG (optional)
+    
+    - name: Create DMG
       run: |
         brew install create-dmg || true
         if command -v create-dmg &> /dev/null; then
@@ -60,10 +57,10 @@ jobs:
             --icon "PDF处理器.app" 200 190 \
             --hide-extension "PDF处理器.app" \
             --app-drop-link 600 185 \
-            "PDF处理器.dmg" \
+            "dist/PDF处理器.dmg" \
             "dist/" || echo "DMG creation skipped"
         fi
-
+    
     - name: Rename files to English names
       run: |
         mkdir -p release
@@ -71,7 +68,7 @@ jobs:
         chmod +x "release/PDFProcessor.app/Contents/MacOS/PDF处理器"
         codesign --force --deep --sign - "release/PDFProcessor.app" || true
         [ -f "dist/PDF处理器.dmg" ] && cp "dist/PDF处理器.dmg" "release/PDFProcessor.dmg"
-
+    
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -81,7 +78,7 @@ jobs:
           release/PDFProcessor.dmg
         if-no-files-found: warn
         retention-days: 30
-
+    
     - name: Create Release (if tag)
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
