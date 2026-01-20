@@ -31,8 +31,7 @@ jobs:
       run: |
         # 下载并安装官方 Python Universal2 版本
         # 官方 Python 提供 Universal2 支持，包含 arm64 和 x86_64
-        PYTHON_VERSION="3.10.13"
-        PYTHON_URL="https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-macos11.pkg"
+        PYTHON_URL="https://www.python.org/ftp/python/3.10.2/python-3.10.2-macos11.pkg"
         
         echo "Downloading Python Universal2 installer..."
         curl -L -o python.pkg "$PYTHON_URL"
