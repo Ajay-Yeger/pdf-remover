@@ -18,12 +18,10 @@ jobs:
         arch: [intel, apple-silicon]
         include:
           - arch: intel
-            runner: macos-13  # Intel 架构 (x86_64)，使用 macOS 13 以更好兼容 macOS 12.7
-            # 注意：macOS 13 runner 将在 2025年12月4日退役，在此之前可能偶尔失败
+            runner: macos-14  # Intel 架构 (x86_64)，使用 macOS 14 以更好兼容 macOS 12.7
             suffix: -Intel
           - arch: apple-silicon
-            runner: macos-13  # Apple Silicon 架构 (arm64)，使用 macOS 13 以更好兼容 macOS 12.7
-            # 注意：macOS 13 runner 将在 2025年12月4日退役，在此之前可能偶尔失败
+            runner: macos-14  # Apple Silicon 架构 (arm64)，使用 macOS 14 以更好兼容 macOS 12.7
             suffix: -AppleSilicon
     runs-on: ${{ matrix.runner }}
     
@@ -34,7 +32,7 @@ jobs:
     - name: Set up Miniconda
       uses: conda-incubator/setup-miniconda@v3
       with:
-        python-version: '3.10'
+        python-version: '3.9'
         channels: conda-forge,defaults
         channel-priority: strict
         auto-activate-base: false
@@ -47,7 +45,7 @@ jobs:
     - name: Create conda environment
       shell: bash -l {0}
       run: |
-        conda create -n build_env python=3.10 -y
+        conda create -n build_env python=3.9 -y
         conda activate build_env
         python --version
         # 检查 Python 的 deployment target（conda 的 Python 通常兼容性更好）
